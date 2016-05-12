@@ -1,5 +1,3 @@
-#ifndef __OpticalFlow_backend_H__
-#define __OpticalFlow_backend_H__
 /*
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -14,6 +12,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#pragma once
 
 /*
   OpticalFlow backend class for ArduPilot
@@ -44,7 +43,7 @@ protected:
 
     // get the flow scaling parameters
     Vector2f _flowScaler(void) const { return Vector2f(frontend._flowScalerX, frontend._flowScalerY); }
+
+    // get the yaw angle in radians
+    float _yawAngleRad(void) const { return radians(float(frontend._yawAngle_cd) * 0.01f); }
 };
-
-#endif // __OpticalFlow_backend_H__
-

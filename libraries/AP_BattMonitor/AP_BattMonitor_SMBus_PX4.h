@@ -15,12 +15,11 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef AP_BATTMONITOR_SMBUS_PX4_H
-#define AP_BATTMONITOR_SMBUS_PX4_H
+#pragma once
 
-#include <AP_Common.h>
-#include <AP_Param.h>
-#include <AP_Math.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_Math/AP_Math.h>
 #include "AP_BattMonitor_SMBus.h"
 
 class AP_BattMonitor_SMBus_PX4 : public AP_BattMonitor_SMBus
@@ -29,12 +28,14 @@ public:
     // Constructor
     AP_BattMonitor_SMBus_PX4(AP_BattMonitor &mon, uint8_t instance, AP_BattMonitor::BattMonitor_State &mon_state);
 
+    /// init
+    void init();
+
     /// read - read the battery voltage and current
     void read();
 
 private:
     int         _batt_sub;          // orb subscription description
-    uint64_t    _last_timestamp;    // time of last update (used to avoid processing old reports)
+    int         _batt_fd;           // file descriptor
+    bool        _capacity_updated;  // capacity info read
 };
-
-#endif // AP_BATTMONITOR_SMBUS_PX4_H

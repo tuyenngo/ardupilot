@@ -16,24 +16,21 @@
 /*
  *   APM_Airspeed.cpp - airspeed (pitot) driver
  */
+#include "AP_Airspeed.h"
 
+#include <AP_ADC/AP_ADC.h>
+#include <AP_Common/AP_Common.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_Math/AP_Math.h>
 
-#include <AP_HAL.h>
-#include <AP_Math.h>
-#include <AP_Common.h>
-#include <AP_ADC.h>
-#include <AP_Airspeed.h>
+extern const AP_HAL::HAL &hal;
 
-extern const AP_HAL::HAL& hal;
+// the virtual pin for digital airspeed sensors
+#define AP_AIRSPEED_I2C_PIN 65
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_APM1
- #include <AP_ADC_AnalogSource.h>
- #define ARSPD_DEFAULT_PIN 64
-#elif CONFIG_HAL_BOARD == HAL_BOARD_APM2
- #define ARSPD_DEFAULT_PIN 0
-#elif CONFIG_HAL_BOARD == HAL_BOARD_AVR_SITL
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
  #define ARSPD_DEFAULT_PIN 1
-#elif CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#elif CONFIG_HAL_BOARD == HAL_BOARD_PX4  || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
  #include <sys/stat.h>
  #include <sys/types.h>
  #include <fcntl.h>
@@ -41,7 +38,19 @@ extern const AP_HAL::HAL& hal;
  #include <systemlib/airspeed.h>
  #include <drivers/drv_airspeed.h>
  #include <uORB/topics/differential_pressure.h>
-#ifdef CONFIG_ARCH_BOARD_PX4FMU_V1
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V45)
+ #define ARSPD_DEFAULT_PIN 0
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V51)
+ #define ARSPD_DEFAULT_PIN 0
+#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V52)
+ #define ARSPD_DEFAULT_PIN 0
+#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51)
+ #define ARSPD_DEFAULT_PIN 0
+#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+ #define ARSPD_DEFAULT_PIN 0
+#elif defined(CONFIG_ARCH_BOARD_VRHERO_V10)
+ #define ARSPD_DEFAULT_PIN 0
+#elif defined(CONFIG_ARCH_BOARD_PX4FMU_V1)
  #define ARSPD_DEFAULT_PIN 11
 #else
  #define ARSPD_DEFAULT_PIN 15
@@ -49,29 +58,17 @@ extern const AP_HAL::HAL& hal;
 #elif CONFIG_HAL_BOARD == HAL_BOARD_FLYMAPLE
  #define ARSPD_DEFAULT_PIN 16
 #elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
- #define ARSPD_DEFAULT_PIN AP_AIRSPEED_I2C_PIN
-#elif CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V40)
- #define ARSPD_DEFAULT_PIN 0
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V45)
- #define ARSPD_DEFAULT_PIN 0
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V50)
- #define ARSPD_DEFAULT_PIN 0
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V51)
- #define ARSPD_DEFAULT_PIN 0
-#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51)
- #define ARSPD_DEFAULT_PIN 0
-#elif defined(CONFIG_ARCH_BOARD_VRHERO_V10)
- #define ARSPD_DEFAULT_PIN 0
-#endif
-#elif CONFIG_HAL_BOARD == HAL_BOARD_LINUX
- #define ARSPD_DEFAULT_PIN AP_AIRSPEED_I2C_PIN
+    #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO2 || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_NAVIO
+         #define ARSPD_DEFAULT_PIN 5
+    #else
+         #define ARSPD_DEFAULT_PIN AP_AIRSPEED_I2C_PIN
+    #endif
 #else
  #define ARSPD_DEFAULT_PIN 0
 #endif
 
 // table of user settable parameters
-const AP_Param::GroupInfo AP_Airspeed::var_info[] PROGMEM = {
+const AP_Param::GroupInfo AP_Airspeed::var_info[] = {
 
     // @Param: ENABLE
     // @DisplayName: Airspeed enable
@@ -127,7 +124,7 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] PROGMEM = {
 
 
 /*
-  this scaling factor converts from the old system where we used a 
+  this scaling factor converts from the old system where we used a
   0 to 4095 raw ADC value for 0-5V to the new system which gets the
   voltage in volts directly from the ADC driver
  */
@@ -139,7 +136,7 @@ void AP_Airspeed::init()
     _calibration.init(_ratio);
     _last_saved_ratio = _ratio;
     _counter = 0;
-    
+
     analog.init();
     digital.init();
 }
@@ -199,7 +196,7 @@ void AP_Airspeed::calibrate(bool in_startup)
     }
     if (count == 0) {
         // unhealthy sensor
-        hal.console->println_P(PSTR("Airspeed sensor unhealthy"));
+        hal.console->println("Airspeed sensor unhealthy");
         _offset.set(0);
         return;
     }
@@ -241,11 +238,11 @@ void AP_Airspeed::read(void)
         airspeed_pressure = fabsf(airspeed_pressure);
         break;
     }
-    airspeed_pressure       = max(airspeed_pressure, 0);
+    airspeed_pressure       = MAX(airspeed_pressure, 0);
     _last_pressure          = airspeed_pressure;
     _raw_airspeed           = sqrtf(airspeed_pressure * _ratio);
     _airspeed               = 0.7f * _airspeed  +  0.3f * _raw_airspeed;
-    _last_update_ms         = hal.scheduler->millis();
+    _last_update_ms         = AP_HAL::millis();
 }
 
 void AP_Airspeed::setHIL(float airspeed, float diff_pressure, float temperature)
@@ -253,7 +250,7 @@ void AP_Airspeed::setHIL(float airspeed, float diff_pressure, float temperature)
     _raw_airspeed = airspeed;
     _airspeed = airspeed;
     _last_pressure = diff_pressure;
-    _last_update_ms = hal.scheduler->millis();    
+    _last_update_ms = AP_HAL::millis();
     _hil_pressure = diff_pressure;
     _hil_set = true;
     _healthy = true;

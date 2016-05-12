@@ -46,16 +46,16 @@
 *           or if the matrix (A) * b = 0
 *
 ****************************************/
+#pragma once
 
-#ifndef VECTOR3_H
-#define VECTOR3_H
-
-#include <math.h>
+#include <cmath>
+#include <float.h>
 #include <string.h>
-
 #if MATH_CHECK_INDEXES
 #include <assert.h>
 #endif
+
+#include "rotations.h"
 
 template <typename T>
 class Matrix3;
@@ -154,10 +154,12 @@ public:
     bool is_inf(void) const;
 
     // check if all elements are zero
-    bool is_zero(void) const { return x==0 && y == 0 && z == 0; }
+    bool is_zero(void) const { return (fabsf(x) < FLT_EPSILON) && (fabsf(y) < FLT_EPSILON) && (fabsf(z) < FLT_EPSILON); }
+
 
     // rotate by a standard rotation
     void rotate(enum Rotation rotation);
+    void rotate_inverse(enum Rotation rotation);
 
     // gets the length of this vector squared
     T  length_squared() const
@@ -214,8 +216,4 @@ typedef Vector3<uint16_t>               Vector3ui;
 typedef Vector3<int32_t>                Vector3l;
 typedef Vector3<uint32_t>               Vector3ul;
 typedef Vector3<float>                  Vector3f;
-#if HAL_CPU_CLASS >= HAL_CPU_CLASS_75
-    typedef Vector3<double>                 Vector3d;
-#endif
-
-#endif // VECTOR3_H
+typedef Vector3<double>                 Vector3d;

@@ -1,6 +1,6 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
 
-#include <AP_HAL.h>
+#include <AP_HAL/AP_HAL.h>
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN
 #include "AnalogIn.h"
@@ -16,8 +16,9 @@
 #include <uORB/topics/battery_status.h>
 #include <uORB/topics/servorail_status.h>
 #include <uORB/topics/system_power.h>
-#include <GCS_MAVLink.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
 #include <errno.h>
+#include <AP_Vehicle/AP_Vehicle.h>
 
 #define ANLOGIN_DEBUGGING 0
 
@@ -40,23 +41,16 @@ static const struct {
     uint8_t pin;
     float scaling;
 } pin_scaling[] = {
-#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V40)
-    {  0, 3.3f/4096 },
-    { 10, 3.3f/4096 },
-    { 11, 3.3f/4096 },
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V45)
-    {  0, 3.3f/4096 },
-    { 10, 3.3f/4096 },
-    { 11, 3.3f/4096 },
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V50)
-    {  0, 3.3f/4096 },
-    { 10, 3.3f/4096 },
-    { 11, 3.3f/4096 },
-#elif defined(CONFIG_ARCH_BOARD_VRBRAIN_V51)
+#if defined(CONFIG_ARCH_BOARD_VRBRAIN_V45) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V51) || defined(CONFIG_ARCH_BOARD_VRBRAIN_V52)
     {  0, 3.3f/4096 },
     { 10, 3.3f/4096 },
     { 11, 3.3f/4096 },
 #elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V51)
+    { 10, 3.3f/4096 },
+#elif defined(CONFIG_ARCH_BOARD_VRUBRAIN_V52)
+    {  1, 3.3f/4096 },
+    {  2, 3.3f/4096 },
+    {  3, 3.3f/4096 },
     { 10, 3.3f/4096 },
 #elif defined(CONFIG_ARCH_BOARD_VRHERO_V10)
     { 10, 3.3f/4096 },
@@ -114,7 +108,7 @@ float VRBRAINAnalogSource::read_latest()
 float VRBRAINAnalogSource::_pin_scaler(void)
 {
     float scaling = VRBRAIN_VOLTAGE_SCALING;
-    uint8_t num_scalings = sizeof(pin_scaling)/sizeof(pin_scaling[0]);
+    uint8_t num_scalings = ARRAY_SIZE(pin_scaling);
     for (uint8_t i=0; i<num_scalings; i++) {
         if (pin_scaling[i].pin == _pin) {
             scaling = pin_scaling[i].scaling;
@@ -196,11 +190,11 @@ VRBRAINAnalogIn::VRBRAINAnalogIn() :
     _power_flags(0)
 {}
 
-void VRBRAINAnalogIn::init(void* machtnichts)
+void VRBRAINAnalogIn::init()
 {
 	_adc_fd = open(ADC_DEVICE_PATH, O_RDONLY | O_NONBLOCK);
     if (_adc_fd == -1) {
-        hal.scheduler->panic("Unable to open " ADC_DEVICE_PATH);
+        AP_HAL::panic("Unable to open " ADC_DEVICE_PATH);
 	}
     _battery_handle   = orb_subscribe(ORB_ID(battery_status));
     _servorail_handle = orb_subscribe(ORB_ID(servorail_status));
@@ -221,7 +215,7 @@ void VRBRAINAnalogIn::next_stop_pin(void)
         VRBRAIN::VRBRAINAnalogSource *c = _channels[idx];
         if (c && c->_stop_pin != -1) {
             // found another stop pin
-            _stop_pin_change_time = hal.scheduler->millis();
+            _stop_pin_change_time = AP_HAL::millis();
             _current_stop_pin_i = idx;
 
             // set that pin high
@@ -247,7 +241,7 @@ void VRBRAINAnalogIn::next_stop_pin(void)
 void VRBRAINAnalogIn::_timer_tick(void)
 {
     // read adc at 100Hz
-    uint32_t now = hal.scheduler->micros();
+    uint32_t now = AP_HAL::micros();
     uint32_t delta_t = now - _last_run;
     if (delta_t < 10000) {
         return;
@@ -277,7 +271,7 @@ void VRBRAINAnalogIn::_timer_tick(void)
                     // the stop pin has been settling for enough time
                     if (c->_stop_pin == -1 || 
                         (_current_stop_pin_i == j &&
-                         hal.scheduler->millis() - _stop_pin_change_time > c->_settle_time_ms)) {
+                         AP_HAL::millis() - _stop_pin_change_time > c->_settle_time_ms)) {
                         c->_add_value(buf_adc[i].am_data, _board_voltage);
                         if (c->_stop_pin != -1 && _current_stop_pin_i == j) {
                             next_stop_pin();
@@ -317,7 +311,7 @@ AP_HAL::AnalogSource* VRBRAINAnalogIn::channel(int16_t pin)
 {
     for (uint8_t j=0; j<VRBRAIN_ANALOG_MAX_CHANNELS; j++) {
         if (_channels[j] == NULL) {
-            _channels[j] = new VRBRAINAnalogSource(pin, 0.0);
+            _channels[j] = new VRBRAINAnalogSource(pin, 0.0f);
             return _channels[j];
         }
     }

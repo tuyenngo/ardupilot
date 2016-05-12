@@ -1,12 +1,11 @@
 /// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-#ifndef AC_FENCE_H
-#define AC_FENCE_H
+#pragma once
 
 #include <inttypes.h>
-#include <AP_Common.h>
-#include <AP_Param.h>
-#include <AP_Math.h>
-#include <AP_InertialNav.h>     // Inertial Navigation library
+#include <AP_Common/AP_Common.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_Math/AP_Math.h>
+#include <AP_InertialNav/AP_InertialNav.h>     // Inertial Navigation library
 
 // bit masks for enabled fence types.  Used for TYPE parameter
 #define AC_FENCE_TYPE_NONE                          0       // fence disabled
@@ -33,7 +32,7 @@ class AC_Fence
 public:
 
     /// Constructor
-    AC_Fence(const AP_InertialNav* inav);
+    AC_Fence(const AP_InertialNav& inav);
 
     /// enable - allows fence to be enabled/disabled.  Note: this does not update the eeprom saved value
     void enable(bool true_false) { _enabled = true_false; }
@@ -52,7 +51,8 @@ public:
     ///
 
     /// check_fence - returns the fence type that has been breached (if any)
-    uint8_t check_fence();
+    ///     curr_alt is the altitude above home in meters
+    uint8_t check_fence(float curr_alt);
 
     /// get_breaches - returns bit mask of the fence types that have been breached
     uint8_t get_breaches() const { return _breached_fences; }
@@ -95,7 +95,7 @@ private:
     void clear_breach(uint8_t fence_type);
 
     // pointers to other objects we depend upon
-    const AP_InertialNav *const _inav;
+    const AP_InertialNav& _inav;
 
     // parameters
     AP_Int8         _enabled;               // top level enable/disable control
@@ -123,4 +123,3 @@ private:
 
     uint32_t        _manual_recovery_start_ms;  // system time in milliseconds that pilot re-took manual control
 };
-#endif	// AC_FENCE_H

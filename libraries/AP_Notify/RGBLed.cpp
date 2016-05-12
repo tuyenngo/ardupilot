@@ -16,19 +16,27 @@
 */
 
 
-#include <AP_HAL.h>
-#include <AP_GPS.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_GPS/AP_GPS.h>
 #include "RGBLed.h"
 #include "AP_Notify.h"
 
 extern const AP_HAL::HAL& hal;
 
 RGBLed::RGBLed(uint8_t led_off, uint8_t led_bright, uint8_t led_medium, uint8_t led_dim):
+    counter(0),
+    step(0),
+    _healthy(false),
+    _red_des(0),
+    _green_des(0),
+    _blue_des(0),
+    _red_curr(0),
+    _green_curr(0),
+    _blue_curr(0),
     _led_off(led_off),
     _led_bright(led_bright),
     _led_medium(led_medium),
     _led_dim(led_dim)
-
 {
 
 }    
@@ -64,6 +72,22 @@ void RGBLed::set_rgb(uint8_t red, uint8_t green, uint8_t blue)
 void RGBLed::update_colours(void)
 {
     uint8_t brightness = _led_bright;
+
+    switch (pNotify->_rgb_led_brightness) {
+    case RGB_LED_OFF:
+        brightness = _led_off;
+        break;
+    case RGB_LED_LOW:
+        brightness = _led_dim;
+        break;
+    case RGB_LED_MEDIUM:
+        brightness = _led_medium;
+        break;
+    case RGB_LED_HIGH:
+        brightness = _led_bright;
+        break;
+    }
+
     // slow rate from 50Hz to 10hz
     counter++;
     if (counter < 5) {
@@ -80,7 +104,7 @@ void RGBLed::update_colours(void)
     }
 
     // use dim light when connected through USB
-    if (hal.gpio->usb_connected()) {
+    if (hal.gpio->usb_connected() && brightness > _led_dim) {
         brightness = _led_dim;
     }
 
@@ -145,11 +169,8 @@ void RGBLed::update_colours(void)
 
     // radio and battery failsafe patter: flash yellow
     // gps failsafe pattern : flashing yellow and blue
-    // baro glitching pattern : flashing yellow and purple
     // ekf_bad pattern : flashing yellow and red
     if (AP_Notify::flags.failsafe_radio || AP_Notify::flags.failsafe_battery ||
-            AP_Notify::flags.failsafe_gps || AP_Notify::flags.gps_glitching ||
-            AP_Notify::flags.baro_glitching ||
             AP_Notify::flags.ekf_bad) {
         switch(step) {
             case 0:
@@ -167,17 +188,7 @@ void RGBLed::update_colours(void)
             case 7:
             case 8:
             case 9:
-                if (AP_Notify::flags.failsafe_gps || AP_Notify::flags.gps_glitching) {
-                    // blue on for gps failsafe or glitching
-                    _red_des = _led_off;
-                    _blue_des = brightness;
-                    _green_des = _led_off;
-                } else if (AP_Notify::flags.baro_glitching) {
-                    // purple on if baro glitching
-                    _red_des = brightness;
-                    _blue_des = brightness;
-                    _green_des = _led_off;
-                } else if (AP_Notify::flags.ekf_bad) {
+                if (AP_Notify::flags.ekf_bad) {
                     // red on if ekf bad
                     _red_des = brightness;
                     _blue_des = _led_off;

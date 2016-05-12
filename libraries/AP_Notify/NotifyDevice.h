@@ -1,5 +1,9 @@
-#ifndef __NOTIFYDEVICE_H__
-#define __NOTIFYDEVICE_H__
+#pragma once
+
+#include <AP_Common/AP_Common.h>
+#include <GCS_MAVLink/GCS_MAVLink.h>
+
+class AP_Notify;
 
 class NotifyDevice {
 public:
@@ -9,6 +13,9 @@ public:
     // update - updates device according to timed_updated.  Should be
     // called at 50Hz
     virtual void update() = 0;
-};
+    // handle a LED_CONTROL message, by default device ignore message
+    virtual void handle_led_control(mavlink_message_t *msg) {}
 
-#endif
+    // this pointer is used to read the parameters relative to devices
+    const AP_Notify *pNotify;
+};
